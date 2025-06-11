@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multiplayer XO | Sunny & Shizune</title>
+  <style>
+    body {
+      background: #0f0f0f;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 10px;
+      color: #00ffe1;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+      margin: 5px;
+      border-radius: 6px;
+      border: none;
+      outline: none;
+    }
+    input {
+      width: 160px;
+    }
+    button {
+      background: #00ffe1;
+      color: #000;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #00c9b7;
+    }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 5px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2rem;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+    .cell:hover {
+      background: #333;
+    }
+    #restartBtn {
+      margin-top: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real-Time XO Game</h1>
+  <input type="text" id="roomId" placeholder="Room ID" />
+  <button onclick="joinGame()">Join</button>
+  <div id="status"></div>
+  <div id="board"></div>
+  <button id="restartBtn" onclick="restartGame()">Restart Game</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let symbol = "";
+    let myTurn = false;
+    let currentRoom = "";
+    let boardState = Array(9).fill(null);
+
+    function joinGame() {
+      currentRoom = document.getElementById("roomId").value.trim();
+      if (currentRoom) {
+        socket.emit("joinGame", currentRoom);
+      }
+    }
+
+    socket.on("joined", (data) => {
+      symbol = data.symbol;
+      document.getElementById("status").innerText = `You are '${symbol}'`;
+    });
+
+    socket.on("startGame", () => {
+      myTurn = (symbol === "X");
+      boardState = Array(9).fill(null);
+      document.getElementById("restartBtn").style.display = "none";
+      renderBoard();
+      updateStatus();
+    });
+
+    socket.on("moveMade", ({ index, symbol: moveSymbol }) => {
+      boardState[index] = moveSymbol;
+      renderBoard();
+      myTurn = (moveSymbol !== symbol);
+      updateStatus();
+      const winner = checkWinner(boardState);
+      if (winner) {
+        document.getElementById("status").innerText = `'${winner}' wins!`;
+        myTurn = false;
+        document.getElementById("restartBtn").style.display = "inline-block";
+      } else if (!boardState.includes(null)) {
+        document.getElementById("status").innerText = `It's a draw!`;
+        document.getElementById("restartBtn").style.display = "inline-block";
+      }
+    });
+
+    socket.on("roomFull", () => {
+      alert("Room is already full.");
+    });
+
+    function renderBoard() {
+      const board = document.getElementById("board");
+      board.innerHTML = "";
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.id = `cell-${i}`;
+        cell.innerText = boardState[i] || "";
+        cell.addEventListener("click", () => makeMove(i));
+        board.appendChild(cell);
+      }
+    }
+
+    function makeMove(index) {
+      if (!myTurn || boardState[index]) return;
+      socket.emit("move", {
+        index,
+        roomId: currentRoom,
+        symbol
+      });
+    }
+
+    function checkWinner(b) {
+      const winPatterns = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      for (let pattern of winPatterns) {
+        const [a, b1, c] = pattern;
+        if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+      }
+      return null;
+    }
+
+    function updateStatus() {
+      if (myTurn) {
+        document.getElementById("status").innerText = `Your turn (${symbol})`;
+      } else {
+        document.getElementById("status").innerText = `Waiting for opponent...`;
+      }
+    }
+
+    function restartGame() {
+      if (currentRoom) {
+        socket.emit("joinGame", currentRoom); // Rejoin same room
+      }
+    }
+  </script>
+</body>
+</html>
