@@ -76,9 +76,10 @@
   <div id="board"></div>
   <button id="restartBtn" onclick="restartGame()">Restart Game</button>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Socket.IO client with your server -->
+  <script src="https://tic-tak-toe-n7nh.onrender.com/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io("https://tic-tak-toe-n7nh.onrender.com"); // your backend domain
     let symbol = "";
     let myTurn = false;
     let currentRoom = "";
@@ -130,7 +131,6 @@
       for (let i = 0; i < 9; i++) {
         const cell = document.createElement("div");
         cell.className = "cell";
-        cell.id = `cell-${i}`;
         cell.innerText = boardState[i] || "";
         cell.addEventListener("click", () => makeMove(i));
         board.appendChild(cell);
@@ -160,11 +160,8 @@
     }
 
     function updateStatus() {
-      if (myTurn) {
-        document.getElementById("status").innerText = `Your turn (${symbol})`;
-      } else {
-        document.getElementById("status").innerText = `Waiting for opponent...`;
-      }
+      document.getElementById("status").innerText = myTurn
+        ? `Your turn (${symbol})` : `Waiting for opponent...`;
     }
 
     function restartGame() {
